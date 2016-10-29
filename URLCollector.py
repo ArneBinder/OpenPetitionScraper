@@ -5,20 +5,22 @@ import urllib2  # get pages
 # from fake_useragent import UserAgent # change user agent
 import time     # to respect page rules
 from bs4 import BeautifulSoup as BS
+import pprint
+import json
+import os
+import io
 # import codecs
 
 __author__ = 'Arne Binder'
 
 
-class URLFront(object):
+class OpenPetitionCrawler(object):
 
-    def __init__(self, rootUrls):
-        self.rootUrls = rootUrls
-        # self.userAgent = 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7'
+    def __init__(self, rootUrl):
+        self.rootUrl = rootUrl # like "https://www.openpetition.de"
 
-    @staticmethod
-    def requestPage(url):
-        request = urllib2.Request(url, None, {'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7'})
+    def requestPage(self, url):
+        request = urllib2.Request(self.rootUrl + url, None, {'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7'})
         try:
             document = urllib2.urlopen(request).read()
         except urllib2.HTTPError, err:
@@ -30,53 +32,167 @@ class URLFront(object):
                 raise
         return document
 
-    def extractPetitionUrlsFromPage(self, pageUrl):
+    def extractPetitionIDs(self, url):
         """
-        Extract all petition urls from an overview page
-        :param pageUrl: the url of the overview page
-        :return: all urls to petitions in the overview page
+        Extract all petition IDs from an overview page
+        :param url: the url suffix of the overview page
+        :return: all IDs of petitions found at the overview page
         """
-        overviewPage = URLFront.requestPage(pageUrl)
+        overviewPage = self.requestPage(url)
         soup = BS(overviewPage.decode('utf-8', 'ignore'), "html.parser")
-
         aList = soup.select('ul.petitionen-liste li div.text h2 a')
 
-        # petitionList = soup("ul", "petitionen-liste")[0]("li")
-        # return [petition("div", "text")[0]("h2")[0]("a")[0]['href'] for petition in petitionList]
-        return [a['href'] for a in aList]
+        return [a['href'].split("/")[-1] for a in aList]
 
-    def constructOverviewPageUrls(self, rootPageUrl):
+    def getPageCountForState(self, state):
         """
         Extract the count of overview pages from the bottom of the page
-        :param rootPageUrl:
-        :return: the count
+        :param state: Select the group of petitions e.g. "in_zeichnung" or "beendet"
+        :return: the count of pages with petitions in the selected group
         """
-        root_page = URLFront.requestPage(rootPageUrl)
+        root_page = self.requestPage("/?status=" + state)
         soup = BS(root_page.decode('utf-8', 'ignore'), "html.parser")
         pager = soup("p", "pager")
         a = pager[0]("a")[-1]
-        # href = a[u'href']
         maxCount = a.text
-        # print range(int(maxCount))
-        return [rootPageUrl + "&seite=" + str(x+1) for x in range(int(maxCount))]
-        # return map(lambda x: rootPageUrl + "&seite=" + str(x+1), range(int(maxCount)))
+        return int(maxCount)
 
-    def extractPetitionUrls(self):
+    def extractAllPetitionIDs(self, state):
+        """
+        Exctract all petition IDs for a certain state.
+        Search at every overview page for the state.
+        :param states: Select the group of petitions e.g. "in_zeichnung" or "beendet"
+        :return: all petition IDs in the petition group
+        """
         result = []
-        for rootPageUrl in self.rootUrls:
-            overviewPageUrls = self.constructOverviewPageUrls(rootPageUrl)
-            for overviewPageUrl in overviewPageUrls:
-                # print overviewPageUrl
-                result.extend(self.extractPetitionUrlsFromPage(overviewPageUrl))
+        # for state in states:
+        count = self.getPageCountForState(state)
+        for i in range(1, count):
+            result.extend(self.extractPetitionIDs("?status=" + state + "&seite=" + str(i)))
         return set(result)
 
+
+    def parsePetition(self, id):
+        """
+        Parse the basic data if the petition
+        :param id: the ID of the petition
+        :return: basic petition data
+        """
+        page = self.requestPage("/petition/online/" + id)
+        result = {}
+        soup = BS(page.decode('utf-8', 'ignore'), "html.parser")
+        petition = soup.select('div#main div.content > div > div > div.col2')[0]
+        result['claimShort'] = petition.find("h2").text
+        content = petition.find("div", "text")
+
+        result['claim'] = content("p")[0].text
+        result['ground'] = content("p")[1].text
+        return result
+
+
+    def parseDebate(self, id):
+        """
+        Parse the debate related to a petition
+        :param id: the ID of the petition the debate belongs to
+        :return: The pro and con arguments of the debate including its counter arguments
+        """
+        page = self.requestPage("/petition/argumente/" + id)
+        soup = BS(page.decode('utf-8', 'ignore'), "html.parser")
+
+        argGroups = soup.select('div.petition-argumente > div > div > div.col2 > div > div.twocol')
+
+        argsPro = []
+        argsCon = []
+
+        for argGroup in argGroups:
+            articles = argGroup("article")
+            args = []
+
+            for article in articles:
+                newArgument = {}
+                newArgument['id'] = article['data-id']
+                tags = article.find("ul", "tags")
+                if tags is not None:
+                    newArgument['tags'] = tags.text
+                newArgument['content'] = article.find("div", "text").text
+                newArgument['counterArguments'] = self.requestPage("/ajax/argument_replies?id=" + newArgument['id'])
+                args.append(newArgument)
+
+            polarity = argGroup.find("h2", "h1").text
+            if polarity == "Pro":
+                argsPro.append(args)
+            elif polarity == "Contra":
+                argsCon.append(args)
+            # else:
+                # print "no"
+
+        return {'pro': argsPro, 'con': argsCon}
+
+
+    def parseComments(self, id):
+        """
+        Parse comment data of a petition
+        :param id: the ID of the petition the comments belong to
+        :return: the comment data
+        """
+        page = self.requestPage("/petition/kommentare/" + id)
+        soup = BS(page.decode('utf-8', 'ignore'), "html.parser")
+        comments = soup.select('article.kommentar > div.text')
+        return [comment.select(' > p')[1].text for comment in comments]
+
+
+    def extractPartitionData(self, id):
+        """
+        Collect all data related to a petition
+        :param id: the id of the petition
+        :return: the data
+        """
+        result = self.parsePetition(id)
+        result['arguments'] = self.parseDebate(id)
+        result['comments'] = self.parseComments(id)
+        return result
+
+def byteify(input):
+    if isinstance(input, dict):
+        return {byteify(key): byteify(value)
+                for key, value in input.iteritems()}
+    elif isinstance(input, list):
+        return [byteify(element) for element in input]
+    elif isinstance(input, unicode):
+        return input.encode('utf-8')
+    else:
+        return input
+
+def writeJsonData(data, path):
+    with io.open(path + '.json', 'w', encoding='utf8') as json_file:
+        out = json.dumps(data, ensure_ascii=False)
+        # unicode(data) auto-decodes data to unicode if str
+        json_file.write(unicode(out))
+
 def main():
-    f = URLFront(["https://www.openpetition.de/?status=in_zeichnung"])
+    folder = "out"
+    sections = ["in_zeichnung"]
+    f = OpenPetitionCrawler("https://www.openpetition.de")
+    for section in sections:
+        ids = f.extractAllPetitionIDs(section)
+       # writeJsonData(ids, folder + os.sep + section)
+
+        if not os.path.exists(folder + os.sep + section):
+            os.makedirs(folder + os.sep + section)
+
+
     # f.extractPetitionUrls()
     # print f.extractPetitionUrlsFromPage("https://www.openpetition.de/?status=in_zeichnung")
     # print f.constructOverviewPageUrls("https://www.openpetition.de/?status=in_zeichnung")
-    for url in f.extractPetitionUrls():
-        print url
+
+    #for id in f.extractAllPetitionIDs(["in_zeichnung"]):
+    #    print id
+    pp = pprint.PrettyPrinter(indent=4)
+    id = "versorgung-mit-lymphdrainage-in-gefahr-aenderung-der-heilmittel-richtlinie-abwenden"
+    data = f.extractPartitionData(id)
+    pp.pprint(data)
+    writeJsonData(data, folder + os.sep + id)
+
 
 
 
