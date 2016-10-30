@@ -71,7 +71,6 @@ class OpenPetitionCrawler(object):
             result.extend(self.extractPetitionIDs("?status=" + state + "&seite=" + str(i)))
         return set(result)
 
-
     def parsePetition(self, id):
         """
         Parse the basic data if the petition
@@ -88,7 +87,6 @@ class OpenPetitionCrawler(object):
         result['claim'] = content("p")[0].text
         result['ground'] = content("p")[1].text
         return result
-
 
     def parseDebate(self, id):
         """
@@ -128,7 +126,6 @@ class OpenPetitionCrawler(object):
 
         return {'pro': argsPro, 'con': argsCon}
 
-
     def parseComments(self, id):
         """
         Parse comment data of a petition
@@ -140,7 +137,6 @@ class OpenPetitionCrawler(object):
         comments = soup.select('article.kommentar > div.text')
         return [comment.select(' > p')[1].text for comment in comments]
 
-
     def extractPartitionData(self, id):
         """
         Collect all data related to a petition
@@ -151,6 +147,19 @@ class OpenPetitionCrawler(object):
         result['arguments'] = self.parseDebate(id)
         result['comments'] = self.parseComments(id)
         return result
+
+    def processIDs(self, ids, path):
+        idsFailed = []
+        if not os.path.exists(path):
+            os.makedirs(path)
+        for id in ids:
+            try:
+                data = self.extractPartitionData(id)
+                writeJsonData(data, path + os.sep + id)
+            except ValueError:
+                idsFailed.append(id)
+        writeJsonData(idsFailed, path + "_FAILED")
+
 
 def byteify(input):
     if isinstance(input, dict):
@@ -169,16 +178,16 @@ def writeJsonData(data, path):
         # unicode(data) auto-decodes data to unicode if str
         json_file.write(unicode(out))
 
+
 def main():
     folder = "out"
     sections = ["in_zeichnung"]
     f = OpenPetitionCrawler("https://www.openpetition.de")
     for section in sections:
-        ids = f.extractAllPetitionIDs(section)
-       # writeJsonData(ids, folder + os.sep + section)
-
-        if not os.path.exists(folder + os.sep + section):
-            os.makedirs(folder + os.sep + section)
+        path = folder + os.sep + section
+        ids = list(f.extractAllPetitionIDs(section))
+        writeJsonData(ids, path + "_ALL")
+        f.processIDs(ids, path)
 
 
     # f.extractPetitionUrls()
@@ -187,13 +196,11 @@ def main():
 
     #for id in f.extractAllPetitionIDs(["in_zeichnung"]):
     #    print id
-    pp = pprint.PrettyPrinter(indent=4)
-    id = "versorgung-mit-lymphdrainage-in-gefahr-aenderung-der-heilmittel-richtlinie-abwenden"
-    data = f.extractPartitionData(id)
-    pp.pprint(data)
-    writeJsonData(data, folder + os.sep + id)
-
-
+    #pp = pprint.PrettyPrinter(indent=4)
+    #id = "versorgung-mit-lymphdrainage-in-gefahr-aenderung-der-heilmittel-richtlinie-abwenden"
+    #data = f.extractPartitionData(id)
+    #pp.pprint(data)
+    #writeJsonData(data, folder + os.sep + id)
 
 
 if __name__ == "__main__":
