@@ -156,7 +156,7 @@ class OpenPetitionCrawler(object):
             try:
                 data = self.extractPartitionData(id)
                 writeJsonData(data, path + os.sep + id)
-            except ValueError:
+            except:
                 idsFailed.append(id)
         writeJsonData(idsFailed, path + "_FAILED")
 
