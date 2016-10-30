@@ -16,17 +16,19 @@ __author__ = 'Arne Binder'
 
 class OpenPetitionCrawler(object):
 
-    def __init__(self, rootUrl):
+    def __init__(self, rootUrl, outFolder):
         self.rootUrl = rootUrl # like "https://www.openpetition.de"
+        self.outFolder = outFolder
 
     def requestPage(self, url):
         request = urllib2.Request(self.rootUrl + url, None, {'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7'})
         try:
+            print 'request ' + self.rootUrl + url
             document = urllib2.urlopen(request).read()
         except urllib2.HTTPError, err:
             if err.code == 503:
                 print "################################################# 503 #################################################"
-                time.sleep(100)
+                time.sleep(30)
                 document = request(url)
             else:
                 raise
@@ -96,12 +98,9 @@ class OpenPetitionCrawler(object):
         """
         page = self.requestPage("/petition/argumente/" + id)
         soup = BS(page.decode('utf-8', 'ignore'), "html.parser")
-
         argGroups = soup.select('div.petition-argumente > div > div > div.col2 > div > div.twocol')
 
-        argsPro = []
-        argsCon = []
-
+        result = {}
         for argGroup in argGroups:
             articles = argGroup("article")
             args = []
@@ -113,18 +112,18 @@ class OpenPetitionCrawler(object):
                 if tags is not None:
                     newArgument['tags'] = tags.text
                 newArgument['content'] = article.find("div", "text").text
-                newArgument['counterArguments'] = self.requestPage("/ajax/argument_replies?id=" + newArgument['id'])
+                newArgument['counterArguments'] = json.loads(self.requestPage("/ajax/argument_replies?id=" + newArgument['id']))
                 args.append(newArgument)
 
             polarity = argGroup.find("h2", "h1").text
             if polarity == "Pro":
-                argsPro.append(args)
+                result['pro'] = args
             elif polarity == "Contra":
-                argsCon.append(args)
+                result['con'] = args
             # else:
                 # print "no"
 
-        return {'pro': argsPro, 'con': argsCon}
+        return result
 
     def parseComments(self, id):
         """
@@ -160,17 +159,13 @@ class OpenPetitionCrawler(object):
                 idsFailed.append(id)
         writeJsonData(idsFailed, path + "_FAILED")
 
+    def processSections(self, sections):
+        for section in sections:
+            path = self.outFolder + os.sep + section
+            ids = list(self.extractAllPetitionIDs(section))
+            writeJsonData(ids, path + "_ALL")
+            self.processIDs(ids, path)
 
-def byteify(input):
-    if isinstance(input, dict):
-        return {byteify(key): byteify(value)
-                for key, value in input.iteritems()}
-    elif isinstance(input, list):
-        return [byteify(element) for element in input]
-    elif isinstance(input, unicode):
-        return input.encode('utf-8')
-    else:
-        return input
 
 def writeJsonData(data, path):
     with io.open(path + '.json', 'w', encoding='utf8') as json_file:
@@ -180,27 +175,14 @@ def writeJsonData(data, path):
 
 
 def main():
-    folder = "out"
-    sections = ["in_zeichnung"]
-    f = OpenPetitionCrawler("https://www.openpetition.de")
-    for section in sections:
-        path = folder + os.sep + section
-        ids = list(f.extractAllPetitionIDs(section))
-        writeJsonData(ids, path + "_ALL")
-        f.processIDs(ids, path)
+    f = OpenPetitionCrawler("https://www.openpetition.de", "out")
+    f.processSections(["in_zeichnung"])
 
-
-    # f.extractPetitionUrls()
-    # print f.extractPetitionUrlsFromPage("https://www.openpetition.de/?status=in_zeichnung")
-    # print f.constructOverviewPageUrls("https://www.openpetition.de/?status=in_zeichnung")
-
-    #for id in f.extractAllPetitionIDs(["in_zeichnung"]):
-    #    print id
     #pp = pprint.PrettyPrinter(indent=4)
-    #id = "versorgung-mit-lymphdrainage-in-gefahr-aenderung-der-heilmittel-richtlinie-abwenden"
+    #id = "sind-vaeter-die-besseren-muetter-das-wechselmodell-als-standard-in-deutschland"
     #data = f.extractPartitionData(id)
     #pp.pprint(data)
-    #writeJsonData(data, folder + os.sep + id)
+    #writeJsonData(data, "test")
 
 
 if __name__ == "__main__":
