@@ -194,13 +194,6 @@ def main():
     f = OpenPetitionScraper("https://www.openpetition.de", "out")
     f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
 
-    # pp = pprint.PrettyPrinter(indent=4)
-    # id = "sind-vaeter-die-besseren-muetter-das-wechselmodell-als-standard-in-deutschland"
-    # ids = f.extractAllPetitionIDs("in_zeichnung")
-    # data = f.extractPartitionData(id)
-    # pp.pprint(ids)
-    # writeJsonData(data, "test")
-
 
 if __name__ == "__main__":
     main()
