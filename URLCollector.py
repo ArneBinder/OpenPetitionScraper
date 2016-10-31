@@ -5,14 +5,11 @@ import urllib2  # get pages
 # from fake_useragent import UserAgent # change user agent
 import time  # to respect page rules
 from bs4 import BeautifulSoup as BS
-import pprint
+# import pprint
 import json
-import os
 import io
-from os import listdir
-from os.path import isfile, join
-
-# import codecs
+from os import listdir, makedirs
+from os.path import isfile, join, exists
 
 __author__ = 'Arne Binder'
 
@@ -21,6 +18,9 @@ class OpenPetitionCrawler(object):
     def __init__(self, rootUrl, outFolder):
         self.rootUrl = rootUrl  # like "https://www.openpetition.de"
         self.outFolder = outFolder
+        # create output folder if necessary
+        if not exists(outFolder):
+            makedirs(outFolder)
 
     def requestPage(self, url):
         request = urllib2.Request(self.rootUrl + url, None, {
@@ -49,20 +49,20 @@ class OpenPetitionCrawler(object):
 
         return [a['href'].split("/")[-1] for a in aList]
 
-    def getPageCountForState(self, state):
+    def getPageCountForSection(self, section):
         """
         Extract the count of overview pages from the bottom of the page
-        :param state: Select the group of petitions e.g. "in_zeichnung" or "beendet"
+        :param section: Select the group of petitions e.g. "in_zeichnung" or "beendet"
         :return: the count of pages with petitions in the selected group
         """
-        root_page = self.requestPage("/?status=" + state)
+        root_page = self.requestPage("/?status=" + section)
         soup = BS(root_page.decode('utf-8', 'ignore'), "html.parser")
         pager = soup("p", "pager")
         a = pager[0]("a")[-1]
         maxCount = a.text
         return int(maxCount)
 
-    def extractAllPetitionIDs(self, state):
+    def extractAllPetitionIDs(self, section):
         """
         Exctract all petition IDs for a certain state.
         Search at every overview page for the state.
@@ -71,9 +71,9 @@ class OpenPetitionCrawler(object):
         """
         result = []
         # for state in states:
-        count = self.getPageCountForState(state)
+        count = self.getPageCountForSection(section)
         for i in range(1, count):
-            result.extend(self.extractPetitionIDs("?status=" + state + "&seite=" + str(i)))
+            result.extend(self.extractPetitionIDs("?status=" + section + "&seite=" + str(i)))
         return set(result)
 
     def parsePetition(self, id):
@@ -109,8 +109,7 @@ class OpenPetitionCrawler(object):
             args = []
 
             for article in articles:
-                newArgument = {}
-                newArgument['id'] = article['data-id']
+                newArgument = {'id': article['data-id']}
                 tags = article.find("ul", "tags")
                 if tags is not None:
                     newArgument['tags'] = tags.text
@@ -129,26 +128,26 @@ class OpenPetitionCrawler(object):
 
         return result
 
-    def parseComments(self, id):
+    def parseComments(self, petitionID):
         """
         Parse comment data of a petition
-        :param id: the ID of the petition the comments belong to
+        :param petitionID: the ID of the petition the comments belong to
         :return: the comment data
         """
-        page = self.requestPage("/petition/kommentare/" + id)
+        page = self.requestPage("/petition/kommentare/" + petitionID)
         soup = BS(page.decode('utf-8', 'ignore'), "html.parser")
         comments = soup.select('article.kommentar > div.text')
         return [comment.select(' > p')[1].text for comment in comments]
 
-    def extractPartitionData(self, id):
+    def extractPartitionData(self, petitionID):
         """
         Collect all data related to a petition
-        :param id: the id of the petition
+        :param petitionID: the id of the petition
         :return: the data
         """
-        result = self.parsePetition(id)
-        result['arguments'] = self.parseDebate(id)
-        result['comments'] = self.parseComments(id)
+        result = self.parsePetition(petitionID)
+        result['arguments'] = self.parseDebate(petitionID)
+        result['comments'] = self.parseComments(petitionID)
         return result
 
     def processIDs(self, ids, path):
@@ -156,15 +155,15 @@ class OpenPetitionCrawler(object):
         for currentID in ids:
             try:
                 data = self.extractPartitionData(currentID)
-                writeJsonData(data, path + os.sep + currentID)
+                writeJsonData(data, join(path, currentID))
             except:
                 idsFailed.append(currentID)
         writeJsonData(idsFailed, path + "_MISSING")
 
     def processSections(self, sections):
         for section in sections:
-            path = self.outFolder + os.sep + section
-            if os.path.exists(path + "_ALL.json"):
+            path = join(self.outFolder, section)
+            if exists(path + "_ALL.json"):
                 # read id list from file
                 with open(path + '_ALL.json') as fileAllIDs:
                     ids = json.load(fileAllIDs)
@@ -172,12 +171,12 @@ class OpenPetitionCrawler(object):
                 ids = list(self.extractAllPetitionIDs(section))
                 writeJsonData(ids, path + "_ALL")
 
-            if not os.path.exists(path):
-                os.makedirs(path)
+            if not exists(path):
+                makedirs(path)
             # get processedIDs from json file
             processedIDs = [f[:-5] for f in listdir(path) if isfile(join(path, f))]
             ids = [id for id in ids if id not in processedIDs]
-            if os.path.exists(path + "_MISSING.json"):
+            if exists(path + "_MISSING.json"):
                 # read id list from file
                 with open(path + '_MISSING.json') as fileMissingIDs:
                     missingIDs = json.load(fileMissingIDs)
