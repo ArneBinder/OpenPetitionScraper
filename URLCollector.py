@@ -181,7 +181,7 @@ class OpenPetitionCrawler(object):
                 # read id list from file
                 with open(path + '_MISSING.json') as fileMissingIDs:
                     missingIDs = json.load(fileMissingIDs)
-            ids.extend(missingIDs)
+                ids.extend(missingIDs)
             self.processIDs(ids, path)
 
 
