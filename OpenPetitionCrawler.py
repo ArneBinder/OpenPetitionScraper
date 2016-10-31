@@ -2,7 +2,6 @@
 # coding: utf-8
 
 import urllib2  # get pages
-# from fake_useragent import UserAgent # change user agent
 import time  # to respect page rules
 from bs4 import BeautifulSoup as BS
 # import pprint
