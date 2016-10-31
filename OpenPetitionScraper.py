@@ -13,7 +13,7 @@ from os.path import isfile, join, exists
 __author__ = 'Arne Binder'
 
 
-class OpenPetitionCrawler(object):
+class OpenPetitionScraper(object):
     def __init__(self, rootUrl, outFolder):
         self.rootUrl = rootUrl  # like "https://www.openpetition.de"
         self.outFolder = outFolder
@@ -191,7 +191,7 @@ def writeJsonData(data, path):
 
 
 def main():
-    f = OpenPetitionCrawler("https://www.openpetition.de", "out")
+    f = OpenPetitionScraper("https://www.openpetition.de", "out")
     f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
 
     # pp = pprint.PrettyPrinter(indent=4)
