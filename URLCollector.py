@@ -3,25 +3,28 @@
 
 import urllib2  # get pages
 # from fake_useragent import UserAgent # change user agent
-import time     # to respect page rules
+import time  # to respect page rules
 from bs4 import BeautifulSoup as BS
 import pprint
 import json
 import os
 import io
+from os import listdir
+from os.path import isfile, join
+
 # import codecs
 
 __author__ = 'Arne Binder'
 
 
 class OpenPetitionCrawler(object):
-
     def __init__(self, rootUrl, outFolder):
-        self.rootUrl = rootUrl # like "https://www.openpetition.de"
+        self.rootUrl = rootUrl  # like "https://www.openpetition.de"
         self.outFolder = outFolder
 
     def requestPage(self, url):
-        request = urllib2.Request(self.rootUrl + url, None, {'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7'})
+        request = urllib2.Request(self.rootUrl + url, None, {
+            'User-Agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.7) Gecko/2009021910 Firefox/3.0.7'})
         try:
             print 'request ' + self.rootUrl + url
             document = urllib2.urlopen(request).read()
@@ -64,7 +67,7 @@ class OpenPetitionCrawler(object):
         Exctract all petition IDs for a certain state.
         Search at every overview page for the state.
         :param states: Select the group of petitions e.g. "in_zeichnung" or "beendet"
-        :return: all petition IDs in the petition group
+        :return: A set of all petition IDs in the petition group
         """
         result = []
         # for state in states:
@@ -112,7 +115,8 @@ class OpenPetitionCrawler(object):
                 if tags is not None:
                     newArgument['tags'] = tags.text
                 newArgument['content'] = article.find("div", "text").text
-                newArgument['counterArguments'] = json.loads(self.requestPage("/ajax/argument_replies?id=" + newArgument['id']))
+                newArgument['counterArguments'] = json.loads(
+                    self.requestPage("/ajax/argument_replies?id=" + newArgument['id']))
                 args.append(newArgument)
 
             polarity = argGroup.find("h2", "h1").text
@@ -120,7 +124,7 @@ class OpenPetitionCrawler(object):
                 result['pro'] = args
             elif polarity == "Contra":
                 result['con'] = args
-            # else:
+                # else:
                 # print "no"
 
         return result
@@ -149,21 +153,35 @@ class OpenPetitionCrawler(object):
 
     def processIDs(self, ids, path):
         idsFailed = []
-        if not os.path.exists(path):
-            os.makedirs(path)
-        for id in ids:
+        for currentID in ids:
             try:
-                data = self.extractPartitionData(id)
-                writeJsonData(data, path + os.sep + id)
+                data = self.extractPartitionData(currentID)
+                writeJsonData(data, path + os.sep + currentID)
             except:
-                idsFailed.append(id)
-        writeJsonData(idsFailed, path + "_FAILED")
+                idsFailed.append(currentID)
+        writeJsonData(idsFailed, path + "_MISSING")
 
     def processSections(self, sections):
         for section in sections:
             path = self.outFolder + os.sep + section
-            ids = list(self.extractAllPetitionIDs(section))
-            writeJsonData(ids, path + "_ALL")
+            if os.path.exists(path + "_ALL.json"):
+                # read id list from file
+                with open(path + '_ALL.json') as fileAllIDs:
+                    ids = json.load(fileAllIDs)
+            else:
+                ids = list(self.extractAllPetitionIDs(section))
+                writeJsonData(ids, path + "_ALL")
+
+            if not os.path.exists(path):
+                os.makedirs(path)
+            # get processedIDs from json file
+            processedIDs = [f[:-5] for f in listdir(path) if isfile(join(path, f))]
+            ids = [id for id in ids if id not in processedIDs]
+            if os.path.exists(path + "_MISSING.json"):
+                # read id list from file
+                with open(path + '_MISSING.json') as fileMissingIDs:
+                    missingIDs = json.load(fileMissingIDs)
+            ids.extend(missingIDs)
             self.processIDs(ids, path)
 
 
@@ -178,13 +196,13 @@ def main():
     f = OpenPetitionCrawler("https://www.openpetition.de", "out")
     f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
 
-    #pp = pprint.PrettyPrinter(indent=4)
-    #id = "sind-vaeter-die-besseren-muetter-das-wechselmodell-als-standard-in-deutschland"
-    #data = f.extractPartitionData(id)
-    #pp.pprint(data)
-    #writeJsonData(data, "test")
+    # pp = pprint.PrettyPrinter(indent=4)
+    # id = "sind-vaeter-die-besseren-muetter-das-wechselmodell-als-standard-in-deutschland"
+    # ids = f.extractAllPetitionIDs("in_zeichnung")
+    # data = f.extractPartitionData(id)
+    # pp.pprint(ids)
+    # writeJsonData(data, "test")
 
 
 if __name__ == "__main__":
     main()
-
