@@ -62,10 +62,9 @@ def createCSVStats(inPath, csvOutPath):
                 statRecords.append(debateStats)
 
     with open(csvOutPath, 'w') as tsvFile:
-        writer = UnicodeDictWriter(tsvFile, fieldnames=captions, delimiter='\t')
+        writer = UnicodeDictWriter(tsvFile, fieldnames=captions, delimiter='\t', lineterminator='\n')
         writer.writeheader()
         writer.writerows(statRecords)
-
 
 class UnicodeDictWriter(csv.DictWriter):
     def _dict_to_list(self, rowdict):

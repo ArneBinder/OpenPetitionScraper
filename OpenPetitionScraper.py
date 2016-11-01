@@ -199,6 +199,5 @@ def main():
     # f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
     Statistics.createCSVStats("out", "stats.tsv")
 
-
 if __name__ == "__main__":
     main()
