@@ -195,9 +195,9 @@ def writeJsonData(data, path):
 
 
 def main():
-    # f = OpenPetitionScraper("https://www.openpetition.de", "out")
-    # f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
-    Statistics.createCSVStats("out", "stats.tsv")
+    f = OpenPetitionScraper("https://www.openpetition.de", "out")
+    f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
+    # Statistics.createCSVStats("out", "stats.tsv")
 
 if __name__ == "__main__":
     main()
