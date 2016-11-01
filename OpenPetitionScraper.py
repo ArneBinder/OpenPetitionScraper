@@ -113,6 +113,7 @@ class OpenPetitionScraper(object):
                 if tags is not None:
                     newArgument['tags'] = tags.text
                 newArgument['content'] = article.find("div", "text").text
+                newArgument['weight'] = article.select('div.tools span.gewicht')[0].text
                 newArgument['counterArguments'] = json.loads(
                     self.requestPage("/ajax/argument_replies?id=" + newArgument['id']))
                 args.append(newArgument)
