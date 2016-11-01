@@ -4,14 +4,13 @@
 import urllib2  # get pages
 import time  # to respect page rules
 
-import sys
 from bs4 import BeautifulSoup as BS
 import pprint
 import json
 import io
-import csv
 from os import listdir, makedirs
-from os.path import isfile, isdir, join, exists
+from os.path import isfile, join, exists
+import Statistics
 
 __author__ = 'Arne Binder'
 
@@ -194,98 +193,11 @@ def writeJsonData(data, path):
         json_file.write(unicode(out))
 
 
-def unicode_csv_reader(unicode_csv_data, dialect=csv.excel, **kwargs):
-    # csv.py doesn't do Unicode; encode temporarily as UTF-8:
-    csv_reader = csv.reader(utf_8_encoder(unicode_csv_data),
-                            dialect=dialect, **kwargs)
-    for row in csv_reader:
-        # decode UTF-8 back to Unicode, cell by cell:
-        yield [unicode(cell, 'utf-8') for cell in row]
-
-
-def utf_8_encoder(unicode_csv_data):
-    for line in unicode_csv_data:
-        yield line.encode('utf-8')
-
-
-def collectStats(debate):
-    return None
-
-
-def collectTextStats(texts, keyPrefix):
-    result = {keyPrefix + '_length_min_chars': sys.maxint, keyPrefix + '_length_max_chars': 0, keyPrefix + '_length_avg_chars': 0, keyPrefix + '_length_min_words': sys.maxint, keyPrefix + '_length_max_words': 0, keyPrefix + '_length_avg_words': 0}
-    for text in texts:
-        # text = argument['content'].strip()
-        lenChars = len(text)
-        lenWords = len(text.split())
-
-        if lenChars > result[keyPrefix + '_length_max_chars']:
-            result[keyPrefix + '_length_max_chars'] = lenChars
-        if lenChars < result[keyPrefix + '_length_min_chars']:
-            result[keyPrefix + '_length_min_chars'] = lenChars
-        result[keyPrefix + '_length_avg_chars'] += lenChars
-        if lenWords > result[keyPrefix + '_length_max_words']:
-            result[keyPrefix + '_length_max_words'] = lenWords
-        if lenWords < result[keyPrefix + '_length_min_words']:
-            result[keyPrefix + '_length_min_words'] = lenWords
-        result[keyPrefix + '_length_avg_words'] += lenWords
-
-    if len(texts) > 0:
-        result[keyPrefix + '_length_avg_chars'] /= len(texts)
-        result[keyPrefix + '_length_avg_words'] /= len(texts)
-        return result
-    else:
-        return {keyPrefix + '_length_min_chars': 0, keyPrefix + '_length_max_chars': 0, keyPrefix + '_length_avg_chars': 0, keyPrefix + '_length_min_words': 0, keyPrefix + '_length_max_words': 0, keyPrefix + '_length_avg_words': 0}
-
-def createCSVStats(inPath, csvOutPath):
-    captions = ["question", "argument_count", "argument_count_pro", "argument_count_con", "argument_length_min_chars",
-                "argument_length_max_chars", "argument_length_avg_chars", "argument_length_min_words",
-                "argument_length_max_words", "argument_length_avg_words", "reply_count", "reply_length_min_chars",
-                "reply_length_max_chars", "reply_length_avg_chars", "reply_length_min_words", "reply_length_max_words",
-                "reply_length_avg_words", "state"]
-    recordDict = []
-    sections = [f for f in listdir(inPath) if isdir(join(inPath, f))]
-
-    for section in sections:
-        sectionPath = join(inPath, section)
-        debateIDs = [f[:-len('.json')] for f in listdir(sectionPath) if isfile(join(sectionPath, f))]
-        for debateID in debateIDs:
-            with open(join(sectionPath, debateID+'.json')) as data_file:
-                data = json.load(data_file)
-                print join(sectionPath, debateID+'.json')
-                debateStats = {}
-                debateStats['question'] = data['claimShort']
-                debateStats['argument_count_pro'] = len(data['arguments']['pro'])
-                debateStats['argument_count_con'] = len(data['arguments']['con'])
-                debateStats['argument_count'] = debateStats['argument_count_pro'] + debateStats['argument_count_con']
-                allArgs = data['arguments']['pro'] + data['arguments']['con']
-                debateStats.update(collectTextStats([argument['content'].strip() for argument in allArgs], 'argument'))
-                replies = []
-                for arg in allArgs:
-                    replies.extend(arg['counterArguments'])
-                debateStats['reply_count'] = len(replies)
-                debateStats.update(collectTextStats([reply['argument_text'] for reply in replies], 'reply'))
-                debateStats['state'] = section
-                recordDict.append(debateStats)
-
-    # csvUW = UnicodeWriter()
-
-
-
-
-    with open(csvOutPath, 'w') as tsvFile:
-        writer = csv.writer(tsvFile, delimiter='\t')
-
-        # write captions
-        writer.writerow(captions)
-        for record in recordDict:
-            writer.writerow([((str(record[key]) if type(record[key]) is int else record[key].encode('utf-8')) if key in record else "-") for key in captions])
-
 
 def main():
-    f = OpenPetitionScraper("https://www.openpetition.de", "out")
-    f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
-    # createCSVStats("out", "out.tsv")
+    # f = OpenPetitionScraper("https://www.openpetition.de", "out")
+    # f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
+    Statistics.createCSVStats("out", "stats.tsv")
 
 
 if __name__ == "__main__":
