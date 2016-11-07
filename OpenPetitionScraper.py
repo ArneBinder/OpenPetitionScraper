@@ -192,12 +192,16 @@ def writeJsonData(data, path):
         # unicode(data) auto-decodes data to unicode if str
         json_file.write(unicode(out))
 
+# def createDataTsv(data, outPath):
 
 
 def main():
-    f = OpenPetitionScraper("https://www.openpetition.de", "out")
-    f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
-    # Statistics.createCSVStats("out", "stats.tsv")
+    # f = OpenPetitionScraper("https://www.openpetition.de", "out")
+    # f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
+    Statistics.createCSVStats("out", "stats.tsv")
+    # for data, id, section in Statistics.dataFiles("out"):
+    #    print section + ": " + id
+
 
 if __name__ == "__main__":
     main()

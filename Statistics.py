@@ -38,33 +38,38 @@ def createCSVStats(inPath, csvOutPath):
                 "reply_length_max_chars", "reply_length_avg_chars", "reply_length_min_words", "reply_length_max_words",
                 "reply_length_avg_words", "state", "question"]
     statRecords = []
-    sections = [f for f in listdir(inPath) if isdir(join(inPath, f))]
-    for section in sections:
-        sectionPath = join(inPath, section)
-        debateIDs = [f[:-len('.json')] for f in listdir(sectionPath) if isfile(join(sectionPath, f))]
-        for debateID in debateIDs:
-            with open(join(sectionPath, debateID+'.json')) as data_file:
-                data = json.load(data_file)
-                print join(sectionPath, debateID+'.json')
-                debateStats = {'id':debateID}
-                debateStats['question'] = data['claimShort']
-                debateStats['argument_count_pro'] = len(data['arguments']['pro'])
-                debateStats['argument_count_con'] = len(data['arguments']['con'])
-                debateStats['argument_count'] = debateStats['argument_count_pro'] + debateStats['argument_count_con']
-                allArgs = data['arguments']['pro'] + data['arguments']['con']
-                debateStats.update(collectTextStats([argument['content'].strip() for argument in allArgs], 'argument'))
-                replies = []
-                for arg in allArgs:
-                    replies.extend(arg['counterArguments'])
-                debateStats['reply_count'] = len(replies)
-                debateStats.update(collectTextStats([reply['argument_text'] for reply in replies], 'reply'))
-                debateStats['state'] = section
-                statRecords.append(debateStats)
+
+    for data, id, section in dataFiles(inPath):
+        debateStats = {'id': id}
+        debateStats['question'] = data['claimShort']
+        debateStats['argument_count_pro'] = len(data['arguments']['pro'])
+        debateStats['argument_count_con'] = len(data['arguments']['con'])
+        debateStats['argument_count'] = debateStats['argument_count_pro'] + debateStats['argument_count_con']
+        allArgs = data['arguments']['pro'] + data['arguments']['con']
+        debateStats.update(collectTextStats([argument['content'].strip() for argument in allArgs], 'argument'))
+        replies = []
+        for arg in allArgs:
+            replies.extend(arg['counterArguments'])
+        debateStats['reply_count'] = len(replies)
+        debateStats.update(collectTextStats([reply['argument_text'] for reply in replies], 'reply'))
+        debateStats['state'] = section
+        statRecords.append(debateStats)
 
     with open(csvOutPath, 'w') as tsvFile:
         writer = UnicodeDictWriter(tsvFile, fieldnames=captions, delimiter='\t', lineterminator='\n')
         writer.writeheader()
         writer.writerows(statRecords)
+
+def dataFiles(path):
+    sections = [f for f in listdir(path) if isdir(join(path, f))]
+    for section in sections:
+        sectionPath = join(path, section)
+        debateIDs = [f[:-len('.json')] for f in listdir(sectionPath) if isfile(join(sectionPath, f))]
+        for debateID in debateIDs:
+            with open(join(sectionPath, debateID + '.json')) as data_file:
+                data = json.load(data_file)
+                yield (data, debateID, section)
+
 
 class UnicodeDictWriter(csv.DictWriter):
     def _dict_to_list(self, rowdict):
