@@ -207,10 +207,10 @@ def argument_row(debate):
 
 def writeTSV(inPath, outPath):
     captions = ['source', 'argument_id', 'reply_id', 'type', 'question', 'content']
-    records = []
 
     for data, debate_id, section in Statistics.dataFiles(inPath):
         if len(data['arguments']['pro']) + len(data['arguments']['pro']) >= 100:
+            records = []
             for arg in argument_row(data):
                 # arg['debate_id'] = debate_id
                 arg['source'] = "https://www.openpetition.de/petition/argumente/" + debate_id
