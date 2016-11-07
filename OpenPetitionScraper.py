@@ -114,7 +114,7 @@ class OpenPetitionScraper(object):
                 tags = article.find("ul", "tags")
                 if tags is not None:
                     newArgument['tags'] = tags.text
-                newArgument['content'] = article.find("div", "text").text
+                newArgument['content'] = next(article.find("div", "text").strings, "")
                 newArgument['weight'] = article.select('div.tools span.gewicht')[0].text
                 newArgument['counterArguments'] = json.loads(
                     self.requestPage("/ajax/argument_replies?id=" + newArgument['id']))
@@ -204,27 +204,29 @@ def argument_row(debate):
                 reply_id += 1
                 yield {'question': debate['claimShort'], 'argument_id':arg_id, 'content': reply['argument_text'].strip(), 'type': 'reply', 'reply_id': reply_id}
 
+
+def writeTSV(inPath, outPath):
+    captions = ['source', 'argument_id', 'reply_id', 'type', 'question', 'content']
+    records = []
+
+    for data, debate_id, section in Statistics.dataFiles(inPath):
+        if len(data['arguments']['pro']) + len(data['arguments']['pro']) >= 100:
+            for arg in argument_row(data):
+                # arg['debate_id'] = debate_id
+                arg['source'] = "https://www.openpetition.de/petition/argumente/" + debate_id
+                records.append(arg)
+
+            with open(join(outPath, section + '_' + debate_id + '.tsv'), 'w') as tsvFile:
+                writer = Statistics.UnicodeDictWriter(tsvFile, fieldnames=captions, delimiter='\t', lineterminator='\n')
+                writer.writeheader()
+                writer.writerows(records)
+
+
 def main():
     # f = OpenPetitionScraper("https://www.openpetition.de", "out")
     # f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
     # Statistics.createCSVStats("out", "stats.tsv")
-    # for data, id, section in Statistics.dataFiles("out"):
-    #    print section + ": " + id
-
-    records = []
-    debate_id = "abschaffung-strassenbaubeitraege-in-schleswig-holstein-keine-staatlich-angeordnete-existenzgefaehrdu"
-    with open(join("out/in_zeichnung", debate_id + '.json')) as data_file:
-        data = json.load(data_file)
-        for arg in argument_row(data):
-            arg['debate_id'] = debate_id
-            arg['source'] = "https://www.openpetition.de/petition/argumente/" + debate_id
-            records.append(arg)
-
-    captions = ['source', 'question', 'debate_id', 'argument_id', 'reply_id', 'content', 'type']
-    with open("test.tsv", 'w') as tsvFile:
-        writer = Statistics.UnicodeDictWriter(tsvFile, fieldnames=captions, delimiter='\t', lineterminator='\n')
-        writer.writeheader()
-        writer.writerows(records)
+    writeTSV("out", "out_tsv")
 
 
 if __name__ == "__main__":
