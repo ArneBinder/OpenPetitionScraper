@@ -114,7 +114,11 @@ class OpenPetitionScraper(object):
                 tags = article.find("ul", "tags")
                 if tags is not None:
                     newArgument['tags'] = tags.text
-                newArgument['content'] = next(article.find("div", "text").strings, "")
+                text = article.find("div", "text")
+                newArgument['content'] = next(text.strings, "")
+                source = text.find('span', 'source')
+                if source:
+                    newArgument['source'] = source.text
                 newArgument['weight'] = article.select('div.tools span.gewicht')[0].text
                 newArgument['counterArguments'] = json.loads(
                     self.requestPage("/ajax/argument_replies?id=" + newArgument['id']))
@@ -199,21 +203,21 @@ def argument_row(debate):
         for argument in debate['arguments'][type]:
             arg_id += 1
             reply_id = 0
-            yield {'question': debate['claimShort'], 'argument_id':arg_id, 'content':argument['content'].strip(), 'type': type, 'reply_id': reply_id}
+            yield {'question': debate['claimShort'], 'argument_id':arg_id, 'content':argument['content'].strip(), 'type': type, 'reply_id': reply_id, 'source': argument['source']}
             for reply in argument['counterArguments']:
                 reply_id += 1
                 yield {'question': debate['claimShort'], 'argument_id':arg_id, 'content': reply['argument_text'].strip(), 'type': 'reply', 'reply_id': reply_id}
 
 
 def writeTSV(inPath, outPath):
-    captions = ['source', 'argument_id', 'reply_id', 'type', 'question', 'content']
+    captions = ['link', 'argument_id', 'reply_id', 'type', 'question', 'content']
 
     for data, debate_id, section in Statistics.dataFiles(inPath):
         if len(data['arguments']['pro']) + len(data['arguments']['pro']) >= 100:
             records = []
             for arg in argument_row(data):
                 # arg['debate_id'] = debate_id
-                arg['source'] = "https://www.openpetition.de/petition/argumente/" + debate_id
+                arg['link'] = "https://www.openpetition.de/petition/argumente/" + debate_id
                 records.append(arg)
 
             with open(join(outPath, section + '_' + debate_id + '.tsv'), 'w') as tsvFile:
@@ -223,10 +227,10 @@ def writeTSV(inPath, outPath):
 
 
 def main():
-    # f = OpenPetitionScraper("https://www.openpetition.de", "out")
-    # f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
+    f = OpenPetitionScraper("https://www.openpetition.de", "out")
+    f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg"])#, "gesperrt"])
     # Statistics.createCSVStats("out", "stats.tsv")
-    writeTSV("out", "out_tsv")
+    # writeTSV("out", "out_tsv")
 
 
 if __name__ == "__main__":
