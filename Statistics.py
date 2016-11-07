@@ -10,6 +10,7 @@ def collectTextStats(texts, keyPrefix):
     result = {keyPrefix + '_length_min_chars': sys.maxint, keyPrefix + '_length_max_chars': 0, keyPrefix + '_length_avg_chars': 0, keyPrefix + '_length_min_words': sys.maxint, keyPrefix + '_length_max_words': 0, keyPrefix + '_length_avg_words': 0}
     for text in texts:
         # text = argument['content'].strip()
+        text = text.strip()
         lenChars = len(text)
         lenWords = len(text.split())
 
@@ -46,7 +47,7 @@ def createCSVStats(inPath, csvOutPath):
         debateStats['argument_count_con'] = len(data['arguments']['con'])
         debateStats['argument_count'] = debateStats['argument_count_pro'] + debateStats['argument_count_con']
         allArgs = data['arguments']['pro'] + data['arguments']['con']
-        debateStats.update(collectTextStats([argument['content'].strip() for argument in allArgs], 'argument'))
+        debateStats.update(collectTextStats([argument['content'] for argument in allArgs], 'argument'))
         replies = []
         for arg in allArgs:
             replies.extend(arg['counterArguments'])

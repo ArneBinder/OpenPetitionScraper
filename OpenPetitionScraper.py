@@ -192,15 +192,39 @@ def writeJsonData(data, path):
         # unicode(data) auto-decodes data to unicode if str
         json_file.write(unicode(out))
 
-# def createDataTsv(data, outPath):
 
+def argument_row(debate):
+    arg_id = 0
+    for type in ['con', 'pro']:
+        for argument in debate['arguments'][type]:
+            arg_id += 1
+            reply_id = 0
+            yield {'question': debate['claimShort'], 'argument_id':arg_id, 'content':argument['content'].strip(), 'type': type, 'reply_id': reply_id}
+            for reply in argument['counterArguments']:
+                reply_id += 1
+                yield {'question': debate['claimShort'], 'argument_id':arg_id, 'content': reply['argument_text'].strip(), 'type': 'reply', 'reply_id': reply_id}
 
 def main():
     # f = OpenPetitionScraper("https://www.openpetition.de", "out")
     # f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg", "gesperrt"])
-    Statistics.createCSVStats("out", "stats.tsv")
+    # Statistics.createCSVStats("out", "stats.tsv")
     # for data, id, section in Statistics.dataFiles("out"):
     #    print section + ": " + id
+
+    records = []
+    debate_id = "abschaffung-strassenbaubeitraege-in-schleswig-holstein-keine-staatlich-angeordnete-existenzgefaehrdu"
+    with open(join("out/in_zeichnung", debate_id + '.json')) as data_file:
+        data = json.load(data_file)
+        for arg in argument_row(data):
+            arg['debate_id'] = debate_id
+            arg['source'] = "https://www.openpetition.de/petition/argumente/" + debate_id
+            records.append(arg)
+
+    captions = ['source', 'question', 'debate_id', 'argument_id', 'reply_id', 'content', 'type']
+    with open("test.tsv", 'w') as tsvFile:
+        writer = Statistics.UnicodeDictWriter(tsvFile, fieldnames=captions, delimiter='\t', lineterminator='\n')
+        writer.writeheader()
+        writer.writerows(records)
 
 
 if __name__ == "__main__":
