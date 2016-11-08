@@ -203,15 +203,16 @@ def argument_row(debate):
         for argument in debate['arguments'][type]:
             arg_id += 1
             reply_id = 0
-            yield {'question': debate['claimShort'], 'argument_id':arg_id, 'content':argument['content'].strip(), 'type': type, 'reply_id': reply_id, 'source': argument['source']}
+            yield {'question': debate['claimShort'], 'argument_id': arg_id, 'content':argument['content'].strip(), 'type': type, 'reply_id': reply_id, 'source': argument.get('source', None)}
             for reply in argument['counterArguments']:
                 reply_id += 1
-                yield {'question': debate['claimShort'], 'argument_id':arg_id, 'content': reply['argument_text'].strip(), 'type': 'reply', 'reply_id': reply_id}
+                yield {'question': debate['claimShort'], 'argument_id': arg_id, 'content': reply['argument_text'].strip(), 'type': 'reply', 'reply_id': reply_id, 'source': None}
 
 
 def writeTSV(inPath, outPath):
-    captions = ['link', 'argument_id', 'reply_id', 'type', 'question', 'content']
-
+    if not exists(outPath):
+        makedirs(outPath)
+    captions = ['link', 'argument_id', 'reply_id', 'type', 'question', 'content', 'source']
     for data, debate_id, section in Statistics.dataFiles(inPath):
         if len(data['arguments']['pro']) + len(data['arguments']['pro']) >= 100:
             records = []
@@ -229,8 +230,8 @@ def writeTSV(inPath, outPath):
 def main():
     f = OpenPetitionScraper("https://www.openpetition.de", "out")
     f.processSections(["in_zeichnung", "in_bearbeitung", "erfolg", "beendet", "misserfolg"])#, "gesperrt"])
-    # Statistics.createCSVStats("out", "stats.tsv")
-    # writeTSV("out", "out_tsv")
+    Statistics.createCSVStats("out", "stats.tsv")
+    writeTSV("out", "out_tsv")
 
 
 if __name__ == "__main__":
